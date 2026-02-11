@@ -1,6 +1,7 @@
 ---
 title: "ps1"
 author: "Xihe Zheng"
+GitHub Repository URL: https://github.com/Xihe-Helena-Tang/gov51_ps1.git
 format: html
 editor: visual
 ---
@@ -9,19 +10,35 @@ editor: visual
 
 Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
 
+```{r}
+install.packages("dplyr")
+install.packages("tidyverse")
+install.packages("rlang")
+```
+
 ## Running Code
 
 When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
 
 ```{r}
-1 + 1
+
+library(tidyverse)
+acs2024_raw<-read.csv("data/raw/acs2024.csv")
+head(acs2024_raw)
 ```
 
 You can add options to executable code like this
 
 ```{r}
-#| echo: false
-2 * 2
+
+library(dplyr)
+acs2024_new <- acs2024_raw |>
+  mutate(
+    SEX = if_else (SEX ==1, 1, 0)
+)
+
+View(acs2024_new)
+
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
