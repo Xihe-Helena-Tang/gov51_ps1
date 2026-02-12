@@ -14,6 +14,7 @@ Quarto enables you to weave together content and executable code into a finished
 install.packages("dplyr")
 install.packages("tidyverse")
 install.packages("rlang")
+install.packages("knitr")
 ```
 
 ## Running Code
@@ -30,15 +31,117 @@ head(acs2024_raw)
 You can add options to executable code like this
 
 ```{r}
-
+##Create new variables
+#Create the sex variable
 library(dplyr)
+library(knitr)
+library(tidyr)
 acs2024_new <- acs2024_raw |>
   mutate(
-    SEX = if_else (SEX ==1, 1, 0)
-)
+    #Create the female variale
+    female = if_else (SEX ==2, 1, 0),
 
-View(acs2024_new)
+    #Create education dummies from EDUC
+    less_than_hs = if_else(EDUC <= 11,1,0),
+    hs_only = if_else(EDUC == 13, 1, 0),
+    some_college = if_else(EDUC %in% c(14, 15), 1, 0),
+    college_only = if_else(EDUC == 16, 1, 0),
+    advanced_degree = if_else(EDUC >= 17, 1, 0),
+    
+    #Create employment dummies from EMPSTAT
+    employed = if_else(EMPSTAT == 1, 1, 0),
+    unemployed = if_else(EMPSTAT == 2, 1, 0),
+    not_in_labor_force = if_else(EMPSTAT == 3, 1, 0))
+
+#Name the variables without underscores
+acs_table1 <- acs2024_new |>
+  select(
+    Age = AGE,
+    Female = female,
+    `Less than High School`= less_than_hs,
+    `High School Only` = hs_only,
+    `Some College` = some_college,
+    `College Only` = college_only,
+    `Advanced Degree` = advanced_degree,
+    Employed = employed,
+    Unemployed = unemployed,
+    `Not in Labor Force` = not_in_labor_force,
+    `Commute Time (mins)` = TRANTIME,
+    `Total Income ($)` = INCTOT
+                               )|>
+  summarise(across(
+    everything(),
+    list(
+      N = ~sum(!is.na(.)),
+      Mean = ~mean(., na.rm = TRUE),
+      `Std.Dev` = ~sd(.,na.rm = TRUE),
+      Min = ~min(., na.rm = TRUE),
+      Max = ~max(., na.rm = TRUE)
+    )))|>
+  pivot_longer(everything(), 
+               names_to = c("Variable", ".value"),
+               names_sep = "_")
+  
+  kable(acs_table1, caption = "Table 1: Summary Statistics for 2024 ACS Sample", align="lrrrrr", digits = 3)
+
+
 
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r}
+###Select the real commuters and analyze their commute time
+##Count the number and percentage of people whose commute time equal zero
+library(dplyr)
+acs2024_new |>
+  summarise(
+    n_nocommute = sum(TRANTIME == 0, na.rm = TRUE),
+    pct_nocommute = mean(TRANTIME == 0, na.rm = TRUE)*100)
+#Answer1: 2062945 people have TRANTIME == 0. The percentage is 60.26914. The people having zero commute time are unemployed people and people that are not in labor force, such as children in lower grades of high schools.
+
+##Create the subset of real commuters
+acs_commuters <- acs2024_new|>
+  filter(EMPSTAT == 1 & TRANTIME != 0 & !is.na(TRANTIME))
+
+acs_commuters |> 
+  summarise(
+    n_commuter = n(),
+    min_commute = min(TRANTIME, na.rm = TRUE))
+#Answer2: My criteria is that real commuters should have a job and need sometime to commute. So I filtered the employed people out (EMPSTAT ==1) and requested that TRANTIME do not equal to zero.
+#Answer3: Only 1359943 observations remained. The mimimum TRANTIME is one minute, which does not make sense at all, as a person can not spend only one minute on the road and call it a commute.
+
+
+#Create a new summary table
+acs_table2 <- acs_commuters |>
+  select(
+    Age = AGE,
+    Female = female,
+    `Less than High School`= less_than_hs,
+    `High School Only` = hs_only,
+    `Some College` = some_college,
+    `College Only` = college_only,
+    `Advanced Degree` = advanced_degree,
+    Employed = employed,
+    Unemployed = unemployed,
+    `Not in Labor Force` = not_in_labor_force,
+    `Commute Time (mins)` = TRANTIME,
+    `Total Income ($)` = INCTOT
+                               )|>
+  summarise(across(
+    everything(),
+    list(
+      N = ~sum(!is.na(.)),
+      Mean = ~mean(., na.rm = TRUE),
+      `Std.Dev` = ~sd(.,na.rm = TRUE),
+      Min = ~min(., na.rm = TRUE),
+      Max = ~max(., na.rm = TRUE)
+    )))|>
+  pivot_longer(everything(), 
+               names_to = c("Variable", ".value"),
+               names_sep = "_")
+  
+  kable(acs_table2, caption = "Table 2: Summary Statistics for 2024 Commuters", align="lrrrrr", digits = 3)
+
+
+```
